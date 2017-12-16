@@ -1,6 +1,13 @@
 KinFu remake
 ============
 
+L. O.: modified version of kinfu:
+-- added marching cubes from PCL;
+-- removed automatic reset;
+-- check difference between consequtive camera poses. 
+
+============ 
+
 This is lightweight, reworked and optimized version of Kinfu that was originally shared in PCL in 2011. 
 
 Key changes/features:
