@@ -1,4 +1,5 @@
 #include "precomp.hpp"
+#include "kfusion/marching_cubes.h"
 
 using namespace kfusion;
 using namespace kfusion::cuda;
@@ -157,4 +158,28 @@ void kfusion::cuda::TsdfVolume::fetchNormals(const DeviceArray<Point>& cloud, De
 
     device::TsdfVolume volume((ushort2*)data_.ptr<ushort2>(), dims, vsz, trunc_dist_, max_weight_);
     device::extractNormals(volume, c, aff, Rinv, gradient_delta_factor_, (float4*)normals.ptr());
+}
+
+bool kfusion::cuda::TsdfVolume::extractMesh(float*& buffer, int& num_points) const {
+	MarchingCubes* mcubes = new MarchingCubes();
+
+	device::Vec3i dims = device_cast<device::Vec3i>(dims_);
+	device::Vec3f vsz = device_cast<device::Vec3f>(getVoxelSize());
+    device::TsdfVolume volume((ushort2*)data_.ptr<ushort2>(), dims, vsz, trunc_dist_, max_weight_);
+
+	bool res = mcubes->run(volume, buffer, num_points);
+	delete mcubes;
+	return res;
+}
+
+bool kfusion::cuda::TsdfVolume::extractMesh(float*& vbuffer, int& num_points, int*& ibuffer, int& num_indices) const {
+	MarchingCubes* mcubes = new MarchingCubes();
+
+	device::Vec3i dims = device_cast<device::Vec3i>(dims_);
+	device::Vec3f vsz = device_cast<device::Vec3f>(getVoxelSize());
+	device::TsdfVolume volume((ushort2*)data_.ptr<ushort2>(), dims, vsz, trunc_dist_, max_weight_);
+
+	bool res = mcubes->run(volume, vbuffer, num_points, ibuffer, num_indices);
+	delete mcubes;
+	return res;
 }

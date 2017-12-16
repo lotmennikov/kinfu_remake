@@ -1,6 +1,6 @@
 #pragma once
 
-#include "internal.hpp"
+#include "../internal.hpp"
 #include "temp_utils.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,6 +58,13 @@ __kf_device__ float kfusion::device::unpack_tsdf(ushort2 value, int& weight)
     weight = value.y;
     return __half2float (value.x);
 }
+
+__kf_device__ void kfusion::device::unpack_tsdf(ushort2 value, float& tsdf, int& weight)
+{
+	tsdf = __half2float(value.x);
+	weight = value.y;
+}
+
 __kf_device__ float kfusion::device::unpack_tsdf (ushort2 value) { return __half2float (value.x); }
 
 

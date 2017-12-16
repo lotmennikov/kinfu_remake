@@ -7,6 +7,16 @@ using namespace kfusion::cuda;
 
 static inline float deg2rad (float alpha) { return alpha * 0.017453293f; }
 
+
+/*
+impl_->depth.GetMetaData (impl_->depthMD);
+const XnDepthPixel* pDepth = impl_->depthMD.Data ();
+int x = impl_->depthMD.FullXRes ();
+int y = impl_->depthMD.FullYRes ();
+cv::Mat(y, x, CV_16U, (void*)pDepth).copyTo(depth);
+
+*/
+
 kfusion::KinFuParams kfusion::KinFuParams::default_params()
 {
     const int iters[] = {10, 5, 4, 0};
@@ -40,6 +50,9 @@ kfusion::KinFuParams kfusion::KinFuParams::default_params()
 
     //p.light_pose = p.volume_pose.translation()/4; //meters
     p.light_pose = Vec3f::all(0.f); //meters
+
+	p.icp_pose_angle_thres = deg2rad(90.0f);
+	p.icp_pose_dist_thres = 0.25f;
 
     return p;
 }
@@ -140,7 +153,7 @@ kfusion::Affine3f kfusion::KinFu::getCameraPose (int time) const
     return poses_[time];
 }
 
-bool kfusion::KinFu::operator()(const kfusion::cuda::Depth& depth, const kfusion::cuda::Image& /*image*/)
+bool kfusion::KinFu::operator()(const kfusion::cuda::Depth& depth, float& angle_diff, float& dist_diff, const kfusion::cuda::Image& /*image*/)
 {
     const KinFuParams& p = params_;
     const int LEVELS = icp_->getUsedLevelsNum();
@@ -172,8 +185,14 @@ bool kfusion::KinFu::operator()(const kfusion::cuda::Depth& depth, const kfusion
 #else
         curr_.points_pyr.swap(prev_.points_pyr);
 #endif
-        curr_.normals_pyr.swap(prev_.normals_pyr);
-        return ++frame_counter_, false;
+		// raycast anyway
+		curr_.normals_pyr.swap(prev_.normals_pyr);
+		volume_->raycast(poses_.back(), p.intr, prev_.points_pyr[0], prev_.normals_pyr[0]);
+		for (int i = 1; i < LEVELS; ++i)
+			resizePointsNormals(prev_.points_pyr[i - 1], prev_.normals_pyr[i - 1], prev_.points_pyr[i], prev_.normals_pyr[i]);
+		
+		return ++frame_counter_, true; // no fail
+		// false;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////
@@ -187,7 +206,27 @@ bool kfusion::KinFu::operator()(const kfusion::cuda::Depth& depth, const kfusion
         bool ok = icp_->estimateTransform(affine, p.intr, curr_.points_pyr, curr_.normals_pyr, prev_.points_pyr, prev_.normals_pyr);
 #endif
         if (!ok)
-            return reset(), false;
+            return /*reset(),*/ false; // fail here, but do not reset
+		else {
+			cv::Vec3f vec = cv::Vec3f(0, 0, 1);
+
+//			cv::Affine3f aprev = poses_.back();
+//			cv::Affine3f acurr = poses_.back()*affine;
+//			cv::Vec3f prev_rot = normalize(aprev.rotation() * vec);
+//			cv::Vec3f curr_rot = normalize(acurr.rotation() * vec);
+//			angle_diff = prev_rot.dot(curr_rot);
+//			dist_diff = cv::norm(aprev.translation() - acurr.translation());
+
+			cv::Vec3f prev_rot = normalize(vec);
+			cv::Vec3f curr_rot = normalize(affine.rotation() * vec);
+			angle_diff = prev_rot.dot(curr_rot);
+			dist_diff = cv::norm(affine.translation());
+
+			if (angle_diff < cos(params_.icp_pose_angle_thres))
+				return false;
+			if (dist_diff > params_.icp_pose_dist_thres)
+				return false;
+		}
     }
 
     poses_.push_back(poses_.back() * affine); // curr -> global
@@ -282,6 +321,14 @@ void kfusion::KinFu::renderImage(cuda::Image& image, const Affine3f& pose, int f
 #undef PASS1
 }
 
+
+bool kfusion::KinFu::extractMesh(float*& buffer, int& num_points) const {
+	return tsdf().extractMesh(buffer, num_points);
+}
+
+bool kfusion::KinFu::extractMesh(float*& vbuffer, int& num_points, int*& ibuffer, int& num_indices) const {
+	return tsdf().extractMesh(vbuffer, num_points, ibuffer, num_indices);
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

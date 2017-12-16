@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kfusion/types.hpp>
+#include "../types.hpp"
 
 namespace kfusion
 {
@@ -51,6 +51,8 @@ namespace kfusion
 
             DeviceArray<Point> fetchCloud(DeviceArray<Point>& cloud_buffer) const;
             void fetchNormals(const DeviceArray<Point>& cloud, DeviceArray<Normal>& normals) const;
+			bool extractMesh(float*& buffer, int& num_points) const;
+			bool extractMesh(float*& vbuffer, int& num_points, int*& ibuffer, int& num_indices) const;
 
             struct Entry
             {

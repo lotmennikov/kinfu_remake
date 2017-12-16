@@ -1,8 +1,8 @@
 #pragma once
 
-#include <kfusion/types.hpp>
-#include <kfusion/cuda/tsdf_volume.hpp>
-#include <kfusion/cuda/projective_icp.hpp>
+#include "types.hpp"
+#include "cuda/tsdf_volume.hpp"
+#include "cuda/projective_icp.hpp"
 #include <vector>
 #include <string>
 
@@ -49,6 +49,9 @@ namespace kfusion
 
         Vec3f light_pose; //meters
 
+		float icp_pose_angle_thres; // difference between sequential poses rotation
+		float icp_pose_dist_thres;  // difference between sequential poses translation
+
     };
 
     class KF_EXPORTS KinFu
@@ -69,12 +72,17 @@ namespace kfusion
 
         void reset();
 
-        bool operator()(const cuda::Depth& dpeth, const cuda::Image& image = cuda::Image());
+		// returns false only when failed
+        bool operator()(const cuda::Depth& dpeth, float& angle_diff, float& dist_diff, const cuda::Image& image = cuda::Image());
 
         void renderImage(cuda::Image& image, int flags = 0);
         void renderImage(cuda::Image& image, const Affine3f& pose, int flags = 0);
 
         Affine3f getCameraPose (int time = -1) const;
+
+		bool extractMesh(float*& buffer, int& num_points) const;
+		bool extractMesh(float*& vbuffer, int& num_points, int*& ibuffer, int& num_indices) const;
+
     private:
         void allocate_buffers();
 

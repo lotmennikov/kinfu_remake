@@ -2,7 +2,6 @@
 
 #include <kfusion/cuda/device_array.hpp>
 #include "safe_call.hpp"
-
 //#define USE_DEPTH
 
 namespace kfusion
@@ -111,9 +110,10 @@ namespace kfusion
         void raycast(const TsdfVolume& volume, const Aff3f& aff, const Mat3f& Rinv,
                      const Reprojector& reproj, Points& points, Normals& normals, float step_factor, float delta_factor);
 
-        __kf_device__ ushort2 pack_tsdf(float tsdf, int weight);
         __kf_device__ float unpack_tsdf(ushort2 value, int& weight);
-        __kf_device__ float unpack_tsdf(ushort2 value);
+		__kf_device__ void unpack_tsdf(ushort2 value, float& tsdf, int& weight);
+		__kf_device__ float unpack_tsdf(ushort2 value);
+		__kf_device__ ushort2 pack_tsdf(float tsdf, int weight);
 
 
         //image proc functions
@@ -141,5 +141,15 @@ namespace kfusion
         struct float8  { float x, y, z, w, c1, c2, c3, c4; };
         struct float12 { float x, y, z, w, normal_x, normal_y, normal_z, n4, c1, c2, c3, c4; };
         void mergePointNormal(const DeviceArray<Point>& cloud, const DeviceArray<float8>& normals, const DeviceArray<float12>& output);
-    }
+    
+		// Marching Cubes
+		void bindTextures(const int *edgeBuf, const int *triBuf, const int *numVertsBuf);
+		void unbindTextures();
+		int getOccupiedVoxels(const TsdfVolume& volume, DeviceArray2D<int>& occupied_voxels);
+		int computeOffsetsAndTotalVertexes(DeviceArray2D<int>& occupied_voxels);
+		void generateTriangles(const TsdfVolume& volume, const DeviceArray2D<int>& occupied_voxels, DeviceArray<Point>& output);
+
+		void generateDoubleInds(const TsdfVolume& volume, const DeviceArray2D<int>& occupied_voxels, int2* double_inds);
+		void computePoints(const TsdfVolume& volume, int2* double_inds, Point* points, int vertices_size);
+	}
 }
